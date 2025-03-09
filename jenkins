@@ -1,0 +1,60 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  initContainers:
+    - name: busybox-share-init
+      image: busybox:musl
+      command:
+        - sh
+      args:
+        - -c
+        - "cp -a /bin/* /busybox"
+      volumeMounts:
+        - name: busybox
+          mountPath: /busybox
+  containers:
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor
+      command:
+        - sleep
+      args:
+        - infinity
+      env:
+        - name: PATH
+          value: /usr/local/bin:/kaniko:/busybox
+      workingDir: /home/jenkins/agent
+      volumeMounts:
+        - name: busybox
+          mountPath: /busybox
+          readOnly: true
+  volumes:
+    - name: busybox
+      emptyDir: {}
+
+"""
+        }
+    }
+    
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', url: 'https://github.com/vcisimportant/test-go-api.git'
+            }
+        }
+        
+        stage('Build with Kaniko') {
+            steps {
+                container('kaniko') {
+                    sh '''
+                    /kaniko/executor --context `pwd` \
+                                     --dockerfile `pwd`/Dockerfile --no-push
+                    '''
+                }
+            }
+        }
+    }
+}
