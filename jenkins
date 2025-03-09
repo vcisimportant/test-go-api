@@ -5,6 +5,10 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
+  hostAliases:
+  - ip: "10.103.81.49"
+    hostnames:
+    - "registry.local"
   initContainers:
     - name: busybox-share-init
       image: busybox:musl
@@ -31,10 +35,17 @@ spec:
         - name: busybox
           mountPath: /busybox
           readOnly: true
+        - name: jenkins-docker-cfg
+          mountPath: /kaniko/.docker
   volumes:
     - name: busybox
       emptyDir: {}
-
+    - name: jenkins-docker-cfg
+      secret:
+        secretName: my-docker-registry
+        items:
+        - key: .dockerconfigjson
+          path: config.json
 """
         }
     }
@@ -51,7 +62,9 @@ spec:
                 container('kaniko') {
                     sh '''
                     /kaniko/executor --context `pwd` \
-                                     --dockerfile `pwd`/Dockerfile --no-push
+                                     --dockerfile `pwd`/Dockerfile \
+                                     --destination registry.local:5000/go-api:${BUILD_NUMBER} \
+                                     --skip-tls-verify
                     '''
                 }
             }
