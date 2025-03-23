@@ -5,6 +5,8 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
+  securityContext:
+    fsGroup: 1000
   hostAliases:
   - ip: "10.103.81.49"
     hostnames:
@@ -37,6 +39,16 @@ spec:
           readOnly: true
         - name: jenkins-docker-cfg
           mountPath: /kaniko/.docker
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      command:
+        - sleep
+      args: 
+        - infinity
+      tty: true
+      securityContext:
+        runAsUser: 1000  # This is usually the Jenkins user ID
+        runAsGroup: 1000
   volumes:
     - name: busybox
       emptyDir: {}
@@ -69,5 +81,21 @@ spec:
                 }
             }
         }
+          stage('Apply Kubernetes files') {
+            steps {
+                container('kubectl') {
+                    sh 'echo teeeeeeeeeest'
+                    sh 'which kubectl || echo "kubectl not found"'
+                    sh 'ls -la /usr/bin/kubectl || echo "No kubectl in /usr/bin"'
+                    sh 'ls -la /usr/local/bin/kubectl || echo "No kubectl in /usr/local/bin"'
+                    
+                    // Try with full path if available
+                    sh 'kubectl version --client || echo "kubectl client version failed"'
+                    withKubeConfig([credentialsId: 'try3', serverUrl: 'https://kubernetes.default.svc']) {
+                        sh 'kubectl get pods || echo "kubectl get pods failed"'
+                    }
+                }
+            }    
+        }
     }
-}
+ }
